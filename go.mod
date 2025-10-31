@@ -1,4 +1,4 @@
-module my-source/go/circuit-breaker
+module github.com/ducxd11041999/circuit-breaker
 
 go 1.25.3
 
