@@ -16,9 +16,10 @@ func TestCircuitBreaker_ClosedToOpen(t *testing.T) {
 	wg.Add(1)
 
 	cb := NewEcoBreaker[int](&BreakerOptions{
-		FailureThreshold: 2,
-		SuccessThreshold: 2,
-		OpenTimeout:      100 * time.Millisecond,
+		FailureThreshold:     2,
+		SuccessThreshold:     2,
+		OpenTimeout:          100 * time.Millisecond,
+		FailureResetDuration: 3 * time.Minute,
 		OnStateChange: func(old, new State) {
 			mu.Lock()
 			defer mu.Unlock()

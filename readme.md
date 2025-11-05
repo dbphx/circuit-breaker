@@ -22,4 +22,4 @@ It helps prevent cascading failures by stopping calls to failing dependencies an
 ## ⚙️ Installation
 
 ```bash
-go get git.infiniband.vn/cloud/insky/eco/utils/circuit-breaker
+go get github.com/dbphx/circuit-breaker

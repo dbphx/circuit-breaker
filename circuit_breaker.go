@@ -16,19 +16,23 @@ type CircuitBreaker[T any] struct {
 	successes  int
 	lastOpened time.Time
 
-	failureThreshold int
-	successThreshold int
-	openTimeout      time.Duration
-	onStateChange    func(old, new State)
+	lastFailureTime time.Time
+
+	failureThreshold     int
+	successThreshold     int
+	openTimeout          time.Duration
+	failureResetDuration time.Duration
+	onStateChange        func(old, new State)
 }
 
 func NewEcoBreaker[T any](cfg *BreakerOptions) IBreaker[T] {
 	return &CircuitBreaker[T]{
-		state:            Closed,
-		failureThreshold: cfg.FailureThreshold,
-		successThreshold: cfg.SuccessThreshold,
-		openTimeout:      cfg.OpenTimeout,
-		onStateChange:    cfg.OnStateChange,
+		state:                Closed,
+		failureThreshold:     cfg.FailureThreshold,
+		successThreshold:     cfg.SuccessThreshold,
+		openTimeout:          cfg.OpenTimeout,
+		failureResetDuration: cfg.FailureResetDuration,
+		onStateChange:        cfg.OnStateChange,
 	}
 }
 
@@ -50,10 +54,17 @@ func (cb *CircuitBreaker[T]) Execute(fn func() (T, error)) (T, error) {
 	switch cb.state {
 	case Closed:
 		if err != nil {
+			now := time.Now()
+
+			if cb.failures > 0 && now.Sub(cb.lastFailureTime) > cb.failureResetDuration {
+				cb.failures = 0
+			}
+
 			cb.failures++
+			cb.lastFailureTime = now
+
 			if cb.failures >= cb.failureThreshold {
 				cb.setState(Open)
-				cb.lastOpened = time.Now()
 			}
 		} else {
 			cb.failures = 0
@@ -61,7 +72,6 @@ func (cb *CircuitBreaker[T]) Execute(fn func() (T, error)) (T, error) {
 	case HalfOpen:
 		if err != nil {
 			cb.setState(Open)
-			cb.lastOpened = time.Now()
 		} else {
 			cb.successes++
 			if cb.successes >= cb.successThreshold {
@@ -75,17 +85,13 @@ func (cb *CircuitBreaker[T]) Execute(fn func() (T, error)) (T, error) {
 func (cb *CircuitBreaker[T]) CurrentState() State {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-	if cb.state == Open && time.Since(cb.lastOpened) > cb.openTimeout {
-		cb.setState(HalfOpen)
-	}
-	return cb.state
+	return cb.currentStateNonBlocking()
 }
 
 func (cb *CircuitBreaker[T]) currentStateNonBlocking() State {
 	if cb.state == Open && time.Since(cb.lastOpened) > cb.openTimeout {
 		cb.setState(HalfOpen)
 	}
-
 	return cb.state
 }
 
@@ -97,6 +103,11 @@ func (cb *CircuitBreaker[T]) setState(new State) {
 	cb.state = new
 	cb.failures = 0
 	cb.successes = 0
+
+	if new == Open {
+		cb.lastOpened = time.Now()
+	}
+
 	if cb.onStateChange != nil {
 		go cb.onStateChange(old, new)
 	}

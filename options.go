@@ -10,11 +10,12 @@ const (
 )
 
 type BreakerOptions struct {
-	Type             BreakerType
-	FailureThreshold int
-	SuccessThreshold int
-	OpenTimeout      time.Duration
-	OnStateChange    func(old, new State)
+	Type                 BreakerType
+	FailureThreshold     int
+	SuccessThreshold     int
+	FailureResetDuration time.Duration
+	OpenTimeout          time.Duration
+	OnStateChange        func(old, new State)
 }
 
 type BreakerOption func(*BreakerOptions)
@@ -50,5 +51,13 @@ func WithOpenTimeout(d time.Duration) BreakerOption {
 func WithOnStateChange(fn func(old, new State)) BreakerOption {
 	return func(cfg *BreakerOptions) {
 		cfg.OnStateChange = fn
+	}
+}
+
+func WithFailureResetDuration(d time.Duration) BreakerOption {
+	return func(cfg *BreakerOptions) {
+		if d > 0 {
+			cfg.FailureResetDuration = d
+		}
 	}
 }
